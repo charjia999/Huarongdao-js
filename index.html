@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>华容道</title>
+<style>
+body{
+    font-family:sans-serif;
+    background:#f4f4f4;
+    text-align:center;
+}
+
+#board{
+    position:relative;
+    width:240px;
+    height:300px;
+    margin:20px auto;
+    background: rgb(25, 5, 5);
+    border:4px solid #333;
+}
+
+.block{
+    position:absolute;
+    background-size:cover;
+    background-position:center;
+    border-radius:6px;
+    cursor:grab;
+    transition: left 0.15s, top 0.15s;
+}
+
+.block.dragging{
+    cursor:grabbing;
+    z-index:1000;
+    transition:none;
+}
+
+.info{ margin-top:10px; }
+button{ padding:6px 14px; }
+</style>
+</head>
+<body>
+
+<h2>华容道 - 严格规则版</h2>
+<div id="board"></div>
+
+<div class="info">
+步数：<span id="steps">0</span>
+<br><br>
+<button onclick="reset()">重置</button>
+</div>
+
+<script>
+const CELL = 60;
+const COLS = 4;
+const ROWS = 5;
+
+let steps = 0;
+let blocks = [];
+let current = null;
+let startX, startY;
+let moveAxis = null;
+
+const initialBlocks = [
+ {id:'cao', x:1,y:0,w:2,h:2,name:'曹操',img:'./images/caocao.jpg'},
+
+ {id:'g1',x:0,y:0,w:1,h:2,name:'张飞',img:'./images/zhangfei.jpg'},
+ {id:'g2',x:3,y:0,w:1,h:2,name:'赵云',img:'./images/zhaoyun.jpg'},
+
+ {id:'g3',x:0,y:2,w:1,h:2,name:'马超',img:'./images/machao.jpg'},
+ {id:'g4',x:3,y:2,w:1,h:2,name:'黄忠',img:'./images/huangzhong.jpg'},
+
+ {id:'h1',x:1,y:2,w:2,h:1,name:'关羽',img:'./images/guanYu.jpg'},
+
+ {id:'s1',x:1,y:3,w:1,h:1,name:'兵',img:'./images/bing6.jpg'},
+ {id:'s2',x:2,y:3,w:1,h:1,name:'兵',img:'./images/bing7.jpg'},
+ {id:'s3',x:0,y:4,w:1,h:1,name:'兵',img:'./images/bing8.jpg'},
+ {id:'s4',x:3,y:4,w:1,h:1,name:'兵',img:'./images/bing9.jpg'},
+];
+
+function reset(){
+    steps = 0;
+    document.getElementById("steps").innerText = steps;
+    blocks = JSON.parse(JSON.stringify(initialBlocks));
+    render();
+}
+
+function render(){
+    const board = document.getElementById("board");
+    board.innerHTML = "";
+
+    blocks.forEach(b=>{
+        const div = document.createElement("div");
+        div.className = "block";
+        div.style.left = b.x * CELL + "px";
+        div.style.top = b.y * CELL + "px";
+        div.style.width = b.w * CELL + "px";
+        div.style.height = b.h * CELL + "px";
+        div.style.backgroundImage = `url(${b.img})`;
+        div.title = b.name;
+
+        div.onmousedown = (e)=> startDrag(e,b,div);
+
+        board.appendChild(div);
+        b.el = div;
+    });
+}
+
+function canPlace(block,x,y){
+    if(x < 0 || y < 0 || x + block.w > COLS || y + block.h > ROWS){
+        return false;
+    }
+
+    for(const b of blocks){
+        if(b === block) continue;
+
+        if(!(x + block.w <= b.x ||
+             x >= b.x + b.w ||
+             y + block.h <= b.y ||
+             y >= b.y + b.h)){
+            return false;
+        }
+    }
+    return true;
+}
+
+function startDrag(e, block, el){
+
+    const canMoveAny =
+        canPlace(block, block.x+1, block.y) ||
+        canPlace(block, block.x-1, block.y) ||
+        canPlace(block, block.x, block.y+1) ||
+        canPlace(block, block.x, block.y-1);
+
+    if(!canMoveAny) return;
+
+    current = block;
+    moveAxis = null;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    el.classList.add("dragging");
+
+    document.onmousemove = drag;
+    document.onmouseup = endDrag;
+}
+
+function drag(e){
+    if(!current) return;
+
+    let dx = e.clientX - startX;
+    let dy = e.clientY - startY;
+
+    if(!moveAxis){
+        moveAxis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    }
+
+    if(moveAxis === "x"){
+        let dir = Math.sign(dx);
+        if(!canPlace(current, current.x + dir, current.y)) return;
+
+        let moveX = dir * Math.min(Math.abs(dx), CELL);
+        current.el.style.left = current.x * CELL + moveX + "px";
+        current.el.style.top = current.y * CELL + "px";
+
+    }else{
+
+        let dir = Math.sign(dy);
+        if(!canPlace(current, current.x, current.y + dir)) return;
+
+        let moveY = dir * Math.min(Math.abs(dy), CELL);
+        current.el.style.left = current.x * CELL + "px";
+        current.el.style.top = current.y * CELL + moveY + "px";
+    }
+}
+
+function endDrag(e){
+    if(!current) return;
+
+    let dx = e.clientX - startX;
+    let dy = e.clientY - startY;
+
+    let newX = current.x;
+    let newY = current.y;
+
+    if(moveAxis === "x"){
+        if(Math.abs(dx) > CELL/2){
+            newX += Math.sign(dx);
+        }
+    }else if(moveAxis === "y"){
+        if(Math.abs(dy) > CELL/2){
+            newY += Math.sign(dy);
+        }
+    }
+
+    if(canPlace(current, newX, newY)){
+        if(newX !== current.x || newY !== current.y){
+            current.x = newX;
+            current.y = newY;
+            steps++;
+            document.getElementById("steps").innerText = steps;
+            checkWin();
+        }
+    }
+
+    current.el.classList.remove("dragging");
+    current = null;
+    moveAxis = null;
+
+    render();
+
+    document.onmousemove = null;
+    document.onmouseup = null;
+}
+
+function checkWin(){
+    const cao = blocks.find(b=>b.id==='cao');
+    if(cao.x===1 && cao.y===3){
+        setTimeout(()=>{
+            alert("🎉 过关！用了 "+steps+" 步");
+        },100);
+    }
+}
+
+reset();
+</script>
+</body>
+</html>
