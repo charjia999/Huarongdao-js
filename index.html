@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>华容道</title>
+<title>华容道 - 带回退与存档</title>
 <style>
 body{
     font-family:sans-serif;
@@ -15,7 +15,7 @@ body{
     width:240px;
     height:300px;
     margin:20px auto;
-    background: rgb(25, 5, 5);
+    background: rgb(25,5,5);
     border:4px solid #333;
 }
 
@@ -35,17 +35,18 @@ body{
 }
 
 .info{ margin-top:10px; }
-button{ padding:6px 14px; }
+button{ padding:6px 14px; margin:4px; }
 </style>
 </head>
 <body>
 
-<h2>华容道 - 严格规则版</h2>
+<h2>华容道</h2>
 <div id="board"></div>
 
 <div class="info">
 步数：<span id="steps">0</span>
 <br><br>
+<button onclick="undo()">回退</button>
 <button onclick="reset()">重置</button>
 </div>
 
@@ -53,35 +54,78 @@ button{ padding:6px 14px; }
 const CELL = 60;
 const COLS = 4;
 const ROWS = 5;
+const STORAGE_KEY = "klotski_save";
 
 let steps = 0;
 let blocks = [];
+let history = [];
+
 let current = null;
 let startX, startY;
 let moveAxis = null;
 
 const initialBlocks = [
  {id:'cao', x:1,y:0,w:2,h:2,name:'曹操',img:'./images/caocao.jpg'},
-
  {id:'g1',x:0,y:0,w:1,h:2,name:'张飞',img:'./images/zhangfei.jpg'},
  {id:'g2',x:3,y:0,w:1,h:2,name:'赵云',img:'./images/zhaoyun.jpg'},
-
  {id:'g3',x:0,y:2,w:1,h:2,name:'马超',img:'./images/machao.jpg'},
  {id:'g4',x:3,y:2,w:1,h:2,name:'黄忠',img:'./images/huangzhong.jpg'},
-
  {id:'h1',x:1,y:2,w:2,h:1,name:'关羽',img:'./images/guanYu.jpg'},
-
  {id:'s1',x:1,y:3,w:1,h:1,name:'兵',img:'./images/bing6.jpg'},
  {id:'s2',x:2,y:3,w:1,h:1,name:'兵',img:'./images/bing7.jpg'},
  {id:'s3',x:0,y:4,w:1,h:1,name:'兵',img:'./images/bing8.jpg'},
  {id:'s4',x:3,y:4,w:1,h:1,name:'兵',img:'./images/bing9.jpg'},
 ];
 
+function saveGame(){
+    const data = {
+        blocks: blocks,
+        steps: steps,
+        history: history
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadGame(){
+    const data = localStorage.getItem(STORAGE_KEY);
+    if(!data){
+        reset();
+        return;
+    }
+    const parsed = JSON.parse(data);
+    blocks = parsed.blocks;
+    steps = parsed.steps;
+    history = parsed.history || [];
+    document.getElementById("steps").innerText = steps;
+    render();
+}
+
+function pushHistory(){
+    history.push(JSON.stringify({
+        blocks: blocks,
+        steps: steps
+    }));
+}
+
+function undo(){
+    if(history.length === 0) return;
+
+    const prev = JSON.parse(history.pop());
+    blocks = prev.blocks;
+    steps = prev.steps;
+
+    document.getElementById("steps").innerText = steps;
+    render();
+    saveGame();
+}
+
 function reset(){
     steps = 0;
-    document.getElementById("steps").innerText = steps;
     blocks = JSON.parse(JSON.stringify(initialBlocks));
+    history = [];
+    document.getElementById("steps").innerText = steps;
     render();
+    saveGame();
 }
 
 function render(){
@@ -109,10 +153,8 @@ function canPlace(block,x,y){
     if(x < 0 || y < 0 || x + block.w > COLS || y + block.h > ROWS){
         return false;
     }
-
     for(const b of blocks){
         if(b === block) continue;
-
         if(!(x + block.w <= b.x ||
              x >= b.x + b.w ||
              y + block.h <= b.y ||
@@ -124,7 +166,6 @@ function canPlace(block,x,y){
 }
 
 function startDrag(e, block, el){
-
     const canMoveAny =
         canPlace(block, block.x+1, block.y) ||
         canPlace(block, block.x-1, block.y) ||
@@ -139,7 +180,6 @@ function startDrag(e, block, el){
     startY = e.clientY;
 
     el.classList.add("dragging");
-
     document.onmousemove = drag;
     document.onmouseup = endDrag;
 }
@@ -161,9 +201,7 @@ function drag(e){
         let moveX = dir * Math.min(Math.abs(dx), CELL);
         current.el.style.left = current.x * CELL + moveX + "px";
         current.el.style.top = current.y * CELL + "px";
-
     }else{
-
         let dir = Math.sign(dy);
         if(!canPlace(current, current.x, current.y + dir)) return;
 
@@ -182,30 +220,28 @@ function endDrag(e){
     let newX = current.x;
     let newY = current.y;
 
-    if(moveAxis === "x"){
-        if(Math.abs(dx) > CELL/2){
-            newX += Math.sign(dx);
-        }
-    }else if(moveAxis === "y"){
-        if(Math.abs(dy) > CELL/2){
-            newY += Math.sign(dy);
-        }
+    if(moveAxis === "x" && Math.abs(dx) > CELL/2){
+        newX += Math.sign(dx);
+    }
+    if(moveAxis === "y" && Math.abs(dy) > CELL/2){
+        newY += Math.sign(dy);
     }
 
-    if(canPlace(current, newX, newY)){
+    if(canPlace(current,newX,newY)){
         if(newX !== current.x || newY !== current.y){
+            pushHistory();
             current.x = newX;
             current.y = newY;
             steps++;
             document.getElementById("steps").innerText = steps;
             checkWin();
+            saveGame();
         }
     }
 
     current.el.classList.remove("dragging");
     current = null;
     moveAxis = null;
-
     render();
 
     document.onmousemove = null;
@@ -221,7 +257,7 @@ function checkWin(){
     }
 }
 
-reset();
+loadGame();
 </script>
 </body>
 </html>
