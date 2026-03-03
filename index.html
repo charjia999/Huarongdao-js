@@ -1,263 +1,319 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>华容道 - 带回退与存档</title>
+<title>华容道</title>
+
 <style>
 body{
-    font-family:sans-serif;
-    background:#f4f4f4;
-    text-align:center;
+ background:#e6e3dc;
+ color:#222;
+ text-align:center;
+ font-family:sans-serif;
+}
+
+#outer{
+ position:relative;
+ width:432px; /* 400 + 16边框 */
+ height:532px;
+ margin:30px auto;
+ background:#5a2a2a;
+ border:8px solid #3b1a1a;
+ box-sizing:border-box;
+}
+
+/* 底部出口 */
+#outer::after{
+ content:"";
+ position:absolute;
+ bottom:-8px;
+ left:116px; /* (400 - 200)/2 */
+ width:200px;
+ height:16px;
+ background:#e6e3dc;
 }
 
 #board{
-    position:relative;
-    width:240px;
-    height:300px;
-    margin:20px auto;
-    background: rgb(25,5,5);
-    border:4px solid #333;
+ position:absolute;
+ top:8px;
+ left:8px;
+ width:400px;
+ height:500px;
+ background:rgb(25,5,5);
 }
 
 .block{
-    position:absolute;
-    background-size:cover;
-    background-position:center;
-    border-radius:6px;
-    cursor:grab;
-    transition: left 0.15s, top 0.15s;
+ position:absolute;
+ border-radius:6px;
+ border:2px solid #222;
+ background-size:cover;
+ background-position:center;
+ transition:left 0.15s ease, top 0.15s ease;
+ cursor:pointer;
+ user-select:none;
+ box-sizing:border-box;
 }
 
-.block.dragging{
-    cursor:grabbing;
-    z-index:1000;
-    transition:none;
+#controls{
+ margin-top:10px;
 }
 
-.info{ margin-top:10px; }
-button{ padding:6px 14px; margin:4px; }
+button{
+ padding:6px 12px;
+ margin:0 5px;
+ background:#5a2a2a;
+ color:white;
+ border:none;
+ border-radius:4px;
+ cursor:pointer;
+}
+
+button:hover{
+ background:#7a3a3a;
+}
 </style>
 </head>
 <body>
 
 <h2>华容道</h2>
-<div id="board"></div>
+<div>步数: <span id="steps">0</span></div>
+<div id="outer">
+  <div id="board"></div>
+</div>
 
-<div class="info">
-步数：<span id="steps">0</span>
-<br><br>
-<button onclick="undo()">回退</button>
-<button onclick="reset()">重置</button>
+<div id="controls">
+ <button onclick="undo()">回退</button>
+ <button onclick="resetGame()">重置</button>
 </div>
 
 <script>
-const CELL = 60;
-const COLS = 4;
-const ROWS = 5;
-const STORAGE_KEY = "klotski_save";
+const CELL=100;
+const COLS=4;
+const ROWS=5;
+const boardDiv=document.getElementById("board");
 
-let steps = 0;
-let blocks = [];
-let history = [];
+let history=[];
+let steps=0;
+let currentOpBlock=null;
+let board=[];
+let blockElements={};
 
-let current = null;
-let startX, startY;
-let moveAxis = null;
-
-const initialBlocks = [
- {id:'cao', x:1,y:0,w:2,h:2,name:'曹操',img:'./images/caocao.jpg'},
- {id:'g1',x:0,y:0,w:1,h:2,name:'张飞',img:'./images/zhangfei.jpg'},
- {id:'g2',x:3,y:0,w:1,h:2,name:'赵云',img:'./images/zhaoyun.jpg'},
- {id:'g3',x:0,y:2,w:1,h:2,name:'马超',img:'./images/machao.jpg'},
- {id:'g4',x:3,y:2,w:1,h:2,name:'黄忠',img:'./images/huangzhong.jpg'},
- {id:'h1',x:1,y:2,w:2,h:1,name:'关羽',img:'./images/guanYu.jpg'},
- {id:'s1',x:1,y:3,w:1,h:1,name:'兵',img:'./images/bing6.jpg'},
- {id:'s2',x:2,y:3,w:1,h:1,name:'兵',img:'./images/bing7.jpg'},
- {id:'s3',x:0,y:4,w:1,h:1,name:'兵',img:'./images/bing8.jpg'},
- {id:'s4',x:3,y:4,w:1,h:1,name:'兵',img:'./images/bing9.jpg'},
+let blocks=[
+ {id:'zf',name:'张飞',shape:[[1],[1]],x:0,y:0,img:'./images/zhangfei.jpg'},
+ {id:'zy',name:'赵云',shape:[[1],[1]],x:3,y:0,img:'./images/zhaoyun.jpg'},
+ {id:'mc',name:'马超',shape:[[1],[1]],x:0,y:2,img:'./images/machao.jpg'},
+ {id:'hz',name:'黄忠',shape:[[1],[1]],x:3,y:2,img:'./images/huangzhong.jpg'},
+ {id:'gy',name:'关羽',shape:[[1,1]],x:1,y:2,img:'./images/guanyu.jpg'},
+ {id:'cc',name:'曹操',shape:[[1,1],[1,1]],x:1,y:0,img:'./images/caocao.jpg'},
+ {id:'b1',name:'兵',shape:[[1]],x:1,y:3,img:'./images/bing6.jpg'},
+ {id:'b2',name:'兵',shape:[[1]],x:2,y:3,img:'./images/bing7.jpg'},
+ {id:'b3',name:'兵',shape:[[1]],x:0,y:4,img:'./images/bing8.jpg'},
+ {id:'b4',name:'兵',shape:[[1]],x:3,y:4,img:'./images/bing9.jpg'}
 ];
 
-function saveGame(){
-    const data = {
-        blocks: blocks,
-        steps: steps,
-        history: history
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-function loadGame(){
-    const data = localStorage.getItem(STORAGE_KEY);
-    if(!data){
-        reset();
-        return;
+function initBoard(){
+ board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+ blocks.forEach(b=>{
+  for(let r=0;r<b.shape.length;r++){
+   for(let c=0;c<b.shape[0].length;c++){
+    if(b.shape[r][c]===1){
+     board[b.y+r][b.x+c]=b.id;
     }
-    const parsed = JSON.parse(data);
-    blocks = parsed.blocks;
-    steps = parsed.steps;
-    history = parsed.history || [];
-    document.getElementById("steps").innerText = steps;
-    render();
-}
-
-function pushHistory(){
-    history.push(JSON.stringify({
-        blocks: blocks,
-        steps: steps
-    }));
-}
-
-function undo(){
-    if(history.length === 0) return;
-
-    const prev = JSON.parse(history.pop());
-    blocks = prev.blocks;
-    steps = prev.steps;
-
-    document.getElementById("steps").innerText = steps;
-    render();
-    saveGame();
-}
-
-function reset(){
-    steps = 0;
-    blocks = JSON.parse(JSON.stringify(initialBlocks));
-    history = [];
-    document.getElementById("steps").innerText = steps;
-    render();
-    saveGame();
+   }
+  }
+ });
 }
 
 function render(){
-    const board = document.getElementById("board");
-    board.innerHTML = "";
+ boardDiv.innerHTML="";
+ blockElements={};
 
-    blocks.forEach(b=>{
-        const div = document.createElement("div");
-        div.className = "block";
-        div.style.left = b.x * CELL + "px";
-        div.style.top = b.y * CELL + "px";
-        div.style.width = b.w * CELL + "px";
-        div.style.height = b.h * CELL + "px";
-        div.style.backgroundImage = `url(${b.img})`;
-        div.title = b.name;
+ blocks.forEach(b=>{
+  const div=document.createElement("div");
+  div.className="block";
+  div.style.width=b.shape[0].length*CELL+"px";
+  div.style.height=b.shape.length*CELL+"px";
+  div.style.left=b.x*CELL+"px";
+  div.style.top=b.y*CELL+"px";
+  div.style.backgroundImage=`url(${b.img})`;
+  div.title=b.name;
+  div.dataset.id=b.id;
 
-        div.onmousedown = (e)=> startDrag(e,b,div);
+  boardDiv.appendChild(div);
+  blockElements[b.id]=div;
+ });
 
-        board.appendChild(div);
-        b.el = div;
-    });
+ document.getElementById("steps").innerText=steps;
 }
 
-function canPlace(block,x,y){
-    if(x < 0 || y < 0 || x + block.w > COLS || y + block.h > ROWS){
-        return false;
-    }
-    for(const b of blocks){
-        if(b === block) continue;
-        if(!(x + block.w <= b.x ||
-             x >= b.x + b.w ||
-             y + block.h <= b.y ||
-             y >= b.y + b.h)){
-            return false;
-        }
-    }
-    return true;
+function canMove(block,dx,dy){
+ for(let r=0;r<block.shape.length;r++){
+  for(let c=0;c<block.shape[0].length;c++){
+   if(block.shape[r][c]===1){
+    let nx=block.x+c+dx;
+    let ny=block.y+r+dy;
+    if(nx<0||nx>=COLS||ny<0||ny>=ROWS) return false;
+    if(board[ny][nx]!==0 && board[ny][nx]!==block.id) return false;
+   }
+  }
+ }
+ return true;
 }
 
-function startDrag(e, block, el){
-    const canMoveAny =
-        canPlace(block, block.x+1, block.y) ||
-        canPlace(block, block.x-1, block.y) ||
-        canPlace(block, block.x, block.y+1) ||
-        canPlace(block, block.x, block.y-1);
-
-    if(!canMoveAny) return;
-
-    current = block;
-    moveAxis = null;
-    startX = e.clientX;
-    startY = e.clientY;
-
-    el.classList.add("dragging");
-    document.onmousemove = drag;
-    document.onmouseup = endDrag;
+function maxMove(block,dirX,dirY){
+ let count=0;
+ while(canMove(block,dirX*(count+1),dirY*(count+1))){
+  count++;
+ }
+ return count;
 }
 
-function drag(e){
-    if(!current) return;
+function moveBlock(block,dx,dy){
+ for(let r=0;r<block.shape.length;r++){
+  for(let c=0;c<block.shape[0].length;c++){
+   if(block.shape[r][c]===1){
+    board[block.y+r][block.x+c]=0;
+   }
+  }
+ }
 
-    let dx = e.clientX - startX;
-    let dy = e.clientY - startY;
+ block.x+=dx;
+ block.y+=dy;
 
-    if(!moveAxis){
-        moveAxis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-    }
-
-    if(moveAxis === "x"){
-        let dir = Math.sign(dx);
-        if(!canPlace(current, current.x + dir, current.y)) return;
-
-        let moveX = dir * Math.min(Math.abs(dx), CELL);
-        current.el.style.left = current.x * CELL + moveX + "px";
-        current.el.style.top = current.y * CELL + "px";
-    }else{
-        let dir = Math.sign(dy);
-        if(!canPlace(current, current.x, current.y + dir)) return;
-
-        let moveY = dir * Math.min(Math.abs(dy), CELL);
-        current.el.style.left = current.x * CELL + "px";
-        current.el.style.top = current.y * CELL + moveY + "px";
-    }
+ for(let r=0;r<block.shape.length;r++){
+  for(let c=0;c<block.shape[0].length;c++){
+   if(block.shape[r][c]===1){
+    board[block.y+r][block.x+c]=block.id;
+   }
+  }
+ }
 }
 
-function endDrag(e){
-    if(!current) return;
+let dragging=null;
+let startX,startY;
+let moveAxis=null;
+let maxPixels=0;
 
-    let dx = e.clientX - startX;
-    let dy = e.clientY - startY;
+boardDiv.addEventListener("mousedown",e=>{
+ const id=e.target.dataset.id;
+ if(!id)return;
 
-    let newX = current.x;
-    let newY = current.y;
+ dragging=blocks.find(b=>b.id===id);
+ startX=e.clientX;
+ startY=e.clientY;
+ moveAxis=null;
 
-    if(moveAxis === "x" && Math.abs(dx) > CELL/2){
-        newX += Math.sign(dx);
-    }
-    if(moveAxis === "y" && Math.abs(dy) > CELL/2){
-        newY += Math.sign(dy);
-    }
+ let el=blockElements[id];
+ el.style.transition="none";
+});
 
-    if(canPlace(current,newX,newY)){
-        if(newX !== current.x || newY !== current.y){
-            pushHistory();
-            current.x = newX;
-            current.y = newY;
-            steps++;
-            document.getElementById("steps").innerText = steps;
-            checkWin();
-            saveGame();
-        }
-    }
+document.addEventListener("mousemove",e=>{
+ if(!dragging)return;
 
-    current.el.classList.remove("dragging");
-    current = null;
-    moveAxis = null;
-    render();
+ let dx=e.clientX-startX;
+ let dy=e.clientY-startY;
 
-    document.onmousemove = null;
-    document.onmouseup = null;
-}
+ if(!moveAxis){
+  moveAxis=Math.abs(dx)>Math.abs(dy)?"x":"y";
+  let dirX=moveAxis==="x"?(dx>0?1:-1):0;
+  let dirY=moveAxis==="y"?(dy>0?1:-1):0;
+  let maxCells=maxMove(dragging,dirX,dirY);
+  maxPixels=maxCells*CELL;
+ }
+
+ let el=blockElements[dragging.id];
+
+ if(moveAxis==="x"){
+  let limited=Math.max(-maxPixels,Math.min(maxPixels,dx));
+  el.style.left=dragging.x*CELL+limited+"px";
+ }else{
+  let limited=Math.max(-maxPixels,Math.min(maxPixels,dy));
+  el.style.top=dragging.y*CELL+limited+"px";
+ }
+});
+
+document.addEventListener("mouseup",e=>{
+ if(!dragging)return;
+
+ let el=blockElements[dragging.id];
+ el.style.transition="left 0.15s ease, top 0.15s ease";
+
+ let dx=e.clientX-startX;
+ let dy=e.clientY-startY;
+
+ let dirX=0,dirY=0;
+
+ if(moveAxis==="x"){
+  dirX=dx>0?1:-1;
+ }else{
+  dirY=dy>0?1:-1;
+ }
+
+ let maxCells=maxMove(dragging,dirX,dirY);
+ let moveCells=Math.round(Math.abs(moveAxis==="x"?dx:dy)/CELL);
+ moveCells=Math.min(moveCells,maxCells);
+
+ if(moveCells>0){
+  moveBlock(dragging,dirX*moveCells,dirY*moveCells);
+
+  if(currentOpBlock!==dragging.id){
+   steps++;
+   currentOpBlock=dragging.id;
+  }
+
+  saveState();
+  checkWin();
+ }
+
+ dragging=null;
+ render();
+});
 
 function checkWin(){
-    const cao = blocks.find(b=>b.id==='cao');
-    if(cao.x===1 && cao.y===3){
-        setTimeout(()=>{
-            alert("🎉 过关！用了 "+steps+" 步");
-        },100);
-    }
+ let cc=blocks.find(b=>b.id==='cc');
+ if(cc.x===1 && cc.y===3){
+  setTimeout(()=>{
+   alert("胜利！共 "+steps+" 步");
+  },200);
+ }
 }
 
-loadGame();
+function saveState(){
+ history.push(JSON.stringify({blocks,steps,currentOpBlock}));
+ localStorage.setItem("hrd",history[history.length-1]);
+}
+
+function undo(){
+ if(history.length<2)return;
+ history.pop();
+ let state=JSON.parse(history[history.length-1]);
+ blocks=state.blocks;
+ steps=state.steps;
+ currentOpBlock=state.currentOpBlock;
+ initBoard();
+ render();
+}
+
+function resetGame(){
+ localStorage.removeItem("hrd");
+ location.reload();
+}
+
+function load(){
+ let data=localStorage.getItem("hrd");
+ if(data){
+  let state=JSON.parse(data);
+  blocks=state.blocks;
+  steps=state.steps;
+  currentOpBlock=state.currentOpBlock;
+ }
+ initBoard();
+ render();
+ saveState();
+}
+
+load();
 </script>
+
 </body>
 </html>
