@@ -2,5 +2,6 @@
 
 This project is just for fun. The images are from the real one I had when I was a kid 😊
 
-<img width="541" height="730" alt="image" src="https://github.com/user-attachments/assets/0c6a2419-1e16-425b-9a5e-af199ee65a5f" />
+https://charjia999.github.io/Huarongdao-js/
 
+<img width="423" height="691" alt="image" src="https://github.com/user-attachments/assets/d388530c-1563-4887-a8e5-98d1c63f204e" />
