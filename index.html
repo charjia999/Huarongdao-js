@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>华容道</title>
 
     <style>
@@ -11,69 +11,128 @@
         color: #222;
         text-align: center;
         font-family: sans-serif;
+        margin: 0;
+        user-select: none;
       }
+
+      /* ===== Game frame ===== */
 
       #outer {
         position: relative;
-        width: 432px; /* 400 + 16边框 */
-        height: 532px;
-        margin: 30px auto;
+
+        /* responsive width */
+        width: min(100vw, 432px);
+
+        /* maintain original aspect ratio */
+        aspect-ratio: 432 / 532;
+
+        margin: 20px auto;
+
         background: #5a2a2a;
         border: 8px solid #3b1a1a;
         box-sizing: border-box;
       }
 
-      /* 底部出口 */
+      /* ===== Exit opening ===== */
+
       #outer::after {
         content: "";
         position: absolute;
+
         bottom: -8px;
-        left: 116px; /* (400 - 200)/2 */
-        width: 200px;
+
+        /* centered exit */
+        left: calc(50% - 23%);
+        width: 46%;
+
         height: 16px;
+
         background: #e6e3dc;
       }
 
+      /* ===== Board ===== */
+
       #board {
         position: absolute;
+
         top: 8px;
         left: 8px;
-        width: 400px;
-        height: 500px;
+
+        /* fill inside frame */
+        width: calc(100% - 16px);
+        height: calc(100% - 16px);
+
         background: rgb(25, 5, 5);
+
+        /* important for mobile dragging */
         touch-action: none;
       }
 
+      /* ===== Blocks ===== */
+
       .block {
         position: absolute;
+
         border-radius: 6px;
         border: 2px solid #222;
+
         background-size: cover;
         background-position: center;
+
         transition:
           left 0.15s ease,
           top 0.15s ease;
+
         cursor: pointer;
-        user-select: none;
+
         box-sizing: border-box;
       }
 
-      #controls {
-        margin-top: 10px;
+      /* subtle hover feedback for desktop */
+
+      .block:hover {
+        transform: scale(1.03);
       }
 
+      /* ===== Controls ===== */
+
+      #controls {
+        margin-top: 12px;
+      }
+
+      /* ===== Buttons ===== */
+
       button {
-        padding: 6px 12px;
-        margin: 0 5px;
+        padding: 8px 14px;
+        margin: 0 6px;
+
         background: #5a2a2a;
         color: white;
+
         border: none;
-        border-radius: 4px;
+        border-radius: 6px;
+
+        font-size: 15px;
+
         cursor: pointer;
       }
 
       button:hover {
         background: #7a3a3a;
+      }
+
+      /* ===== Mobile adjustments ===== */
+
+      @media (max-width: 480px) {
+        h2 {
+          font-size: 20px;
+          margin-top: 10px;
+        }
+
+        button {
+          padding: 10px 16px;
+          font-size: 16px;
+        }
       }
     </style>
   </head>
@@ -90,7 +149,7 @@
     </div>
 
     <script>
-      const CELL = Math.min(window.innerWidth / 4, 100);
+      let CELL;
       const COLS = 4;
       const ROWS = 5;
       const boardDiv = document.getElementById("board");
@@ -187,6 +246,10 @@
         },
       ];
 
+      function updateCell() {
+        CELL = boardDiv.clientWidth / COLS;
+      }
+
       function initBoard() {
         board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
         blocks.forEach((b) => {
@@ -201,6 +264,8 @@
       }
 
       function render() {
+        updateCell();
+
         boardDiv.innerHTML = "";
         blockElements = {};
 
@@ -271,10 +336,14 @@
       let moveAxis = null;
       let maxPixels = 0;
 
+      window.addEventListener("resize", () => {
+        render();
+      });
+
       boardDiv.addEventListener("pointerdown", (e) => {
         const id = e.target.dataset.id;
         if (!id) return;
-        
+
         dragging = blocks.find((b) => b.id === id);
         startX = e.clientX;
         startY = e.clientY;
@@ -317,7 +386,8 @@
         let dx = e.clientX - startX;
         let dy = e.clientY - startY;
 
-        let dirX = 0, dirY = 0;
+        let dirX = 0,
+          dirY = 0;
 
         if (moveAxis === "x") {
           dirX = dx > 0 ? 1 : -1;
