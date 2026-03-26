@@ -2,6 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>华容道</title>
 
     <style>
@@ -40,6 +41,7 @@
         width: 400px;
         height: 500px;
         background: rgb(25, 5, 5);
+        touch-action: none;
       }
 
       .block {
@@ -88,7 +90,7 @@
     </div>
 
     <script>
-      const CELL = 100;
+      const CELL = Math.min(window.innerWidth / 4, 100);
       const COLS = 4;
       const ROWS = 5;
       const boardDiv = document.getElementById("board");
@@ -269,12 +271,10 @@
       let moveAxis = null;
       let maxPixels = 0;
 
-      boardDiv.addEventListener("mousedown", (e) => {
+      boardDiv.addEventListener("pointerdown", (e) => {
         const id = e.target.dataset.id;
-
         if (!id) return;
         
-
         dragging = blocks.find((b) => b.id === id);
         startX = e.clientX;
         startY = e.clientY;
@@ -282,9 +282,10 @@
 
         let el = blockElements[id];
         el.style.transition = "none";
+        boardDiv.setPointerCapture(e.pointerId);
       });
 
-      document.addEventListener("mousemove", (e) => {
+      document.addEventListener("pointermove", (e) => {
         if (!dragging) return;
 
         let dx = e.clientX - startX;
@@ -307,7 +308,7 @@
         }
       });
 
-      document.addEventListener("mouseup", (e) => {
+      document.addEventListener("pointerup", (e) => {
         if (!dragging) return;
 
         let el = blockElements[dragging.id];
@@ -316,8 +317,7 @@
         let dx = e.clientX - startX;
         let dy = e.clientY - startY;
 
-        let dirX = 0,
-          dirY = 0;
+        let dirX = 0, dirY = 0;
 
         if (moveAxis === "x") {
           dirX = dx > 0 ? 1 : -1;
@@ -342,6 +342,8 @@
         }
 
         dragging = null;
+        moveAxis = null;
+
         render();
       });
 
