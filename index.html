@@ -74,20 +74,21 @@
 
       .block {
         position: absolute;
-
         border-radius: 6px;
         border: 2px solid #222;
-
-        background-size: cover;
-        background-position: center;
+        overflow: hidden;
 
         transition:
           left 0.15s ease,
           top 0.15s ease;
 
         cursor: pointer;
-
         box-sizing: border-box;
+      }
+
+      .block img {
+        position: absolute;
+        object-fit: cover;
       }
 
       /* subtle hover feedback for desktop */
@@ -136,6 +137,23 @@
           font-size: 16px;
         }
       }
+
+      #levelSelect {
+        position: fixed;
+        inset: 0;
+
+        background: rgba(0, 0, 0, 0.7);
+
+        display: none;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #levelImage {
+        width: 90%;
+        max-width: 548px;
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>
@@ -148,105 +166,27 @@
     <div id="controls">
       <button onclick="undo()">回退</button>
       <button onclick="resetGame()">重置</button>
+      <button onclick="openLevelSelect()">选关</button>
     </div>
 
+    <div id="levelSelect">
+      <img src="./images/levels.png" id="levelImage" />
+    </div>
+
+    <script src="./levels.js"></script>
     <script>
       let CELL;
       const COLS = 4;
       const ROWS = 5;
       const boardDiv = document.getElementById("board");
 
-      let history = [];
-      let steps = 0;
-      let currentOpBlock = null;
       let board = [];
       let blockElements = {};
 
-      let blocks = [
-        {
-          id: "zf",
-          name: "张飞",
-          shape: [[1], [1]],
-          x: 0,
-          y: 0,
-          img: "./images/zhangfei.jpg",
-        },
-        {
-          id: "zy",
-          name: "赵云",
-          shape: [[1], [1]],
-          x: 3,
-          y: 0,
-          img: "./images/zhaoyun.jpg",
-        },
-        {
-          id: "mc",
-          name: "马超",
-          shape: [[1], [1]],
-          x: 0,
-          y: 2,
-          img: "./images/machao.jpg",
-        },
-        {
-          id: "hz",
-          name: "黄忠",
-          shape: [[1], [1]],
-          x: 3,
-          y: 2,
-          img: "./images/huangzhong.jpg",
-        },
-        {
-          id: "gy",
-          name: "关羽",
-          shape: [[1, 1]],
-          x: 1,
-          y: 2,
-          img: "./images/guanyu.jpg",
-        },
-        {
-          id: "cc",
-          name: "曹操",
-          shape: [
-            [1, 1],
-            [1, 1],
-          ],
-          x: 1,
-          y: 0,
-          img: "./images/caocao.jpg",
-        },
-        {
-          id: "b1",
-          name: "兵",
-          shape: [[1]],
-          x: 1,
-          y: 3,
-          img: "./images/bing6.jpg",
-        },
-        {
-          id: "b2",
-          name: "兵",
-          shape: [[1]],
-          x: 2,
-          y: 3,
-          img: "./images/bing7.jpg",
-        },
-        {
-          id: "b3",
-          name: "兵",
-          shape: [[1]],
-          x: 0,
-          y: 4,
-          img: "./images/bing8.jpg",
-        },
-        {
-          id: "b4",
-          name: "兵",
-          shape: [[1]],
-          x: 3,
-          y: 4,
-          img: "./images/bing9.jpg",
-        },
-      ];
+      let currentLevel = 0;
+      let currentOpBlock = null;
+      let moveHistory = [];
+      let steps = 0;
 
       function updateCell() {
         CELL = boardDiv.clientWidth / COLS;
@@ -278,16 +218,95 @@
           div.style.height = b.shape.length * CELL + "px";
           div.style.left = b.x * CELL + "px";
           div.style.top = b.y * CELL + "px";
-          div.style.backgroundImage = `url(${b.img})`;
+          const img = document.createElement("img");
+          img.src = b.img;
+
+          img.style.pointerEvents = "none";
+          img.style.position = "absolute";
+
+          const rot = b.rot || 0;
+
+          img.style.left = "50%";
+          img.style.top = "50%";
+          img.style.transformOrigin = "center";
+
+          /* parent block size */
+          const w = b.shape[0].length * CELL;
+          const h = b.shape.length * CELL;
+
+          /* simulate rotate-first */
+          if (rot % 180 !== 0) {
+            img.style.width = h + "px";
+            img.style.height = w + "px";
+          } else {
+            img.style.width = w + "px";
+            img.style.height = h + "px";
+          }
+
+          img.style.transform = `translate(-50%, -50%) rotate(${rot}deg)`;
+
+          div.appendChild(img);
+
           div.title = b.name;
           div.dataset.id = b.id;
-
           boardDiv.appendChild(div);
           blockElements[b.id] = div;
         });
 
         document.getElementById("steps").innerText = steps;
       }
+
+      function openLevelSelect() {
+        document.getElementById("levelSelect").style.display = "flex";
+      }
+
+      function loadLevel(index) {
+        currentLevel = index;
+        blocks = structuredClone(LEVELS[index]);
+
+        currentOpBlock = null;
+        moveHistory = [];
+        steps = 0;
+
+        let data = localStorage.getItem("hrd");
+        if (data) {
+          let state = JSON.parse(data);
+          blocks = state.blocks;
+          steps = state.steps;
+          currentOpBlock = state.currentOpBlock;
+          currentLevel = state.currentLevel;
+        }
+
+        initBoard();
+        render();
+        saveState();
+      }
+
+      const img = document.getElementById("levelImage");
+
+      img.addEventListener("click", (e) => {
+        const rect = img.getBoundingClientRect();
+
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const col = Math.floor(x / (rect.width / 8));
+        const row = Math.floor(y / (rect.height / 6));
+
+        const level = row * 8 + col;
+
+        if (level === currentLevel) {
+          document.getElementById("levelSelect").style.display = "none";
+          return;
+        }
+
+        if (level < LEVELS.length) {
+          localStorage.removeItem("hrd");
+          document.getElementById("levelSelect").style.display = "none";
+
+          loadLevel(level);
+        }
+      });
 
       function canMove(block, dx, dy) {
         for (let r = 0; r < block.shape.length; r++) {
@@ -429,14 +448,16 @@
       }
 
       function saveState() {
-        history.push(JSON.stringify({ blocks, steps, currentOpBlock }));
-        localStorage.setItem("hrd", history[history.length - 1]);
+        moveHistory.push(
+          JSON.stringify({ blocks, steps, currentOpBlock, currentLevel }),
+        );
+        localStorage.setItem("hrd", moveHistory[moveHistory.length - 1]);
       }
 
       function undo() {
-        if (history.length < 2) return;
-        history.pop();
-        let state = JSON.parse(history[history.length - 1]);
+        if (moveHistory.length < 2) return;
+        moveHistory.pop();
+        let state = JSON.parse(moveHistory[moveHistory.length - 1]);
         blocks = state.blocks;
         steps = state.steps;
         currentOpBlock = state.currentOpBlock;
@@ -446,23 +467,10 @@
 
       function resetGame() {
         localStorage.removeItem("hrd");
-        location.reload();
+        loadLevel(currentLevel);
       }
 
-      function load() {
-        let data = localStorage.getItem("hrd");
-        if (data) {
-          let state = JSON.parse(data);
-          blocks = state.blocks;
-          steps = state.steps;
-          currentOpBlock = state.currentOpBlock;
-        }
-        initBoard();
-        render();
-        saveState();
-      }
-
-      load();
+      loadLevel(currentLevel);
     </script>
   </body>
 </html>
