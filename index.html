@@ -4,161 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>华容道</title>
-
-    <style>
-      body {
-        background: #e6e3dc;
-        color: #222;
-        text-align: center;
-        font-family: sans-serif;
-        margin: 0;
-        user-select: none;
-        overflow-x: hidden;
-      }
-
-      /* ===== Game frame ===== */
-
-      #outer {
-        position: relative;
-
-        /* responsive width */
-        width: 100%;
-        max-width: 432px;
-
-        /* maintain original aspect ratio */
-        aspect-ratio: 432 / 532;
-
-        margin: 12px auto;
-
-        background: #5a2a2a;
-        border: 8px solid #3b1a1a;
-        box-sizing: border-box;
-      }
-
-      /* ===== Exit opening ===== */
-
-      #outer::after {
-        content: "";
-        position: absolute;
-
-        bottom: -8px;
-
-        /* centered exit */
-        left: calc(50% - 23%);
-        width: 46%;
-
-        height: 16px;
-
-        background: #e6e3dc;
-      }
-
-      /* ===== Board ===== */
-
-      #board {
-        position: absolute;
-
-        top: 8px;
-        left: 8px;
-
-        /* fill inside frame */
-        width: calc(100% - 16px);
-        height: calc(100% - 16px);
-
-        background: rgb(25, 5, 5);
-
-        /* important for mobile dragging */
-        touch-action: none;
-      }
-
-      /* ===== Blocks ===== */
-
-      .block {
-        position: absolute;
-        border-radius: 6px;
-        border: 2px solid #222;
-        overflow: hidden;
-
-        transition:
-          left 0.15s ease,
-          top 0.15s ease;
-
-        cursor: pointer;
-        box-sizing: border-box;
-      }
-
-      .block img {
-        position: absolute;
-        object-fit: cover;
-      }
-
-      /* subtle hover feedback for desktop */
-
-      .block:hover {
-        transform: scale(1.03);
-      }
-
-      /* ===== Controls ===== */
-
-      #controls {
-        margin-top: 12px;
-      }
-
-      /* ===== Buttons ===== */
-
-      button {
-        padding: 8px 14px;
-        margin: 0 6px;
-
-        background: #5a2a2a;
-        color: white;
-
-        border: none;
-        border-radius: 6px;
-
-        font-size: 15px;
-
-        cursor: pointer;
-      }
-
-      button:hover {
-        background: #7a3a3a;
-      }
-
-      /* ===== Mobile adjustments ===== */
-
-      @media (max-width: 480px) {
-        h2 {
-          font-size: 20px;
-          margin-top: 10px;
-        }
-
-        button {
-          padding: 10px 16px;
-          font-size: 16px;
-        }
-      }
-
-      #levelSelect {
-        position: fixed;
-        inset: 0;
-
-        background: rgba(0, 0, 0, 0.7);
-
-        display: none;
-        justify-content: center;
-        align-items: center;
-      }
-
-      #levelImage {
-        width: 90%;
-        max-width: 548px;
-        cursor: pointer;
-      }
-    </style>
+    <link rel="stylesheet" href="./style.css?v=1" />
   </head>
   <body>
     <h2>华容道</h2>
-    <div>步数: <span id="steps">0</span></div>
+    <div>
+      第 <span id="levelNum">1</span> 关　 步数: <span id="steps">0</span>
+    </div>
     <div id="outer">
       <div id="board"></div>
     </div>
@@ -173,7 +25,7 @@
       <img src="./images/levels.png" id="levelImage" />
     </div>
 
-    <script src="./levels.js"></script>
+    <script src="./levels.js?v=1"></script>
     <script>
       let CELL;
       const COLS = 4;
@@ -254,6 +106,7 @@
         });
 
         document.getElementById("steps").innerText = steps;
+        document.getElementById("levelNum").innerText = currentLevel + 1;
       }
 
       function openLevelSelect() {
