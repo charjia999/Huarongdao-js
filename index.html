@@ -7,24 +7,35 @@
     <link rel="stylesheet" href="./style.css?v=1" />
   </head>
   <body>
-    <h2>华容道</h2>
-    <div>
-      第 <span id="levelNum">1</span> 关　 步数: <span id="steps">0</span>
+    <div id="header">
+      <h2 id="title"></h2>
+
+      <div id="langSwitch">
+        <button onclick="setLang('zh')">中</button>
+        <button onclick="setLang('en')">EN</button>
+      </div>
     </div>
+
+    <div>
+      <span id="levelText"></span>
+      <span id="stepsText"></span>: <span id="steps">0</span>
+    </div>
+
     <div id="outer">
       <div id="board"></div>
     </div>
 
     <div id="controls">
-      <button onclick="undo()">回退</button>
-      <button onclick="resetGame()">重置</button>
-      <button onclick="openLevelSelect()">选关</button>
+      <button id="undoBtn" onclick="undo()"></button>
+      <button id="resetBtn" onclick="resetGame()"></button>
+      <button id="selectBtn" onclick="openLevelSelect()"></button>
     </div>
 
     <div id="levelSelect">
       <img src="./images/levels.png" id="levelImage" />
     </div>
     <script src="./levels.js?v=1"></script>
+    <script src="./i18n.js?v=1"></script>
     <script src="./game.js?v=1"></script>
   </body>
 </html>
