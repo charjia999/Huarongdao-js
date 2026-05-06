@@ -28,6 +28,20 @@ function initBoard() {
   });
 }
 
+function renderText() {
+  document.getElementById("title").innerText = t("title");
+
+  document.getElementById("levelText").innerText =
+    t("level", { n: currentLevel + 1 });
+
+  document.getElementById("stepsText").innerText =
+    t("steps");
+
+  document.getElementById("undoBtn").innerText = t("undo");
+  document.getElementById("resetBtn").innerText = t("reset");
+  document.getElementById("selectBtn").innerText = t("select");
+}
+
 function render() {
   updateCell();
 
@@ -76,8 +90,8 @@ function render() {
     blockElements[b.id] = div;
   });
 
+  renderText();
   document.getElementById("steps").innerText = steps;
-  document.getElementById("levelNum").innerText = currentLevel + 1;
 }
 
 function openLevelSelect() {
@@ -265,7 +279,7 @@ function checkWin() {
   let cc = blocks.find((b) => b.id === "cc");
   if (cc.x === 1 && cc.y === 3) {
     setTimeout(() => {
-      alert("胜利！共 " + steps + " 步");
+      alert(t("win", { n: steps }));
     }, 200);
   }
 }

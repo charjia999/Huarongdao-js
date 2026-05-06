@@ -146,3 +146,23 @@ button:hover {
   max-width: 548px;
   cursor: pointer;
 }
+
+#header {
+  position: relative;
+  max-width: 432px;
+  margin: 0 auto;
+}
+
+#langSwitch {
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+#langSwitch button {
+  margin-left: 4px;
+  font-size: 12px;
+  width: 40px;
+  height: 20px;
+  padding: 0;
+}
