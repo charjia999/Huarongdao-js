@@ -1,0 +1,298 @@
+let CELL;
+const COLS = 4;
+const ROWS = 5;
+const boardDiv = document.getElementById("board");
+
+let board = [];
+let blockElements = {};
+
+let currentLevel = 0;
+let currentOpBlock = null;
+let moveHistory = [];
+let steps = 0;
+
+function updateCell() {
+  CELL = boardDiv.clientWidth / COLS;
+}
+
+function initBoard() {
+  board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+  blocks.forEach((b) => {
+    for (let r = 0; r < b.shape.length; r++) {
+      for (let c = 0; c < b.shape[0].length; c++) {
+        if (b.shape[r][c] === 1) {
+          board[b.y + r][b.x + c] = b.id;
+        }
+      }
+    }
+  });
+}
+
+function render() {
+  updateCell();
+
+  boardDiv.innerHTML = "";
+  blockElements = {};
+
+  blocks.forEach((b) => {
+    const div = document.createElement("div");
+    div.className = "block";
+    div.style.width = b.shape[0].length * CELL + "px";
+    div.style.height = b.shape.length * CELL + "px";
+    div.style.left = b.x * CELL + "px";
+    div.style.top = b.y * CELL + "px";
+    const img = document.createElement("img");
+    img.src = b.img;
+
+    img.style.pointerEvents = "none";
+    img.style.position = "absolute";
+
+    const rot = b.rot || 0;
+
+    img.style.left = "50%";
+    img.style.top = "50%";
+    img.style.transformOrigin = "center";
+
+    /* parent block size */
+    const w = b.shape[0].length * CELL;
+    const h = b.shape.length * CELL;
+
+    /* simulate rotate-first */
+    if (rot % 180 !== 0) {
+      img.style.width = h + "px";
+      img.style.height = w + "px";
+    } else {
+      img.style.width = w + "px";
+      img.style.height = h + "px";
+    }
+
+    img.style.transform = `translate(-50%, -50%) rotate(${rot}deg)`;
+
+    div.appendChild(img);
+
+    div.title = b.name;
+    div.dataset.id = b.id;
+    boardDiv.appendChild(div);
+    blockElements[b.id] = div;
+  });
+
+  document.getElementById("steps").innerText = steps;
+  document.getElementById("levelNum").innerText = currentLevel + 1;
+}
+
+function openLevelSelect() {
+  document.getElementById("levelSelect").style.display = "flex";
+}
+
+function loadLevel(index) {
+  currentLevel = index;
+  blocks = structuredClone(LEVELS[index]);
+
+  currentOpBlock = null;
+  moveHistory = [];
+  steps = 0;
+
+  let data = localStorage.getItem("hrd");
+  if (data) {
+    let state = JSON.parse(data);
+    blocks = state.blocks;
+    steps = state.steps;
+    currentOpBlock = state.currentOpBlock;
+    currentLevel = state.currentLevel;
+  }
+
+  initBoard();
+  render();
+  saveState();
+}
+
+const img = document.getElementById("levelImage");
+
+img.addEventListener("click", (e) => {
+  const rect = img.getBoundingClientRect();
+
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const col = Math.floor(x / (rect.width / 8));
+  const row = Math.floor(y / (rect.height / 6));
+
+  const level = row * 8 + col;
+
+  if (level === currentLevel) {
+    document.getElementById("levelSelect").style.display = "none";
+    return;
+  }
+
+  if (level < LEVELS.length) {
+    localStorage.removeItem("hrd");
+    document.getElementById("levelSelect").style.display = "none";
+
+    loadLevel(level);
+  }
+});
+
+function canMove(block, dx, dy) {
+  for (let r = 0; r < block.shape.length; r++) {
+    for (let c = 0; c < block.shape[0].length; c++) {
+      if (block.shape[r][c] === 1) {
+        let nx = block.x + c + dx;
+        let ny = block.y + r + dy;
+        if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) return false;
+        if (board[ny][nx] !== 0 && board[ny][nx] !== block.id) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function maxMove(block, dirX, dirY) {
+  let count = 0;
+  while (canMove(block, dirX * (count + 1), dirY * (count + 1))) {
+    count++;
+  }
+  return count;
+}
+
+function moveBlock(block, dx, dy) {
+  for (let r = 0; r < block.shape.length; r++) {
+    for (let c = 0; c < block.shape[0].length; c++) {
+      if (block.shape[r][c] === 1) {
+        board[block.y + r][block.x + c] = 0;
+      }
+    }
+  }
+
+  block.x += dx;
+  block.y += dy;
+
+  for (let r = 0; r < block.shape.length; r++) {
+    for (let c = 0; c < block.shape[0].length; c++) {
+      if (block.shape[r][c] === 1) {
+        board[block.y + r][block.x + c] = block.id;
+      }
+    }
+  }
+}
+
+let dragging = null;
+let startX, startY;
+let moveAxis = null;
+let maxPixels = 0;
+
+window.addEventListener("resize", () => {
+  render();
+});
+
+boardDiv.addEventListener("pointerdown", (e) => {
+  const id = e.target.dataset.id;
+  if (!id) return;
+
+  dragging = blocks.find((b) => b.id === id);
+  startX = e.clientX;
+  startY = e.clientY;
+  moveAxis = null;
+
+  let el = blockElements[id];
+  el.style.transition = "none";
+  boardDiv.setPointerCapture(e.pointerId);
+});
+
+document.addEventListener("pointermove", (e) => {
+  if (!dragging) return;
+
+  let dx = e.clientX - startX;
+  let dy = e.clientY - startY;
+
+  moveAxis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+  let dirX = moveAxis === "x" ? (dx > 0 ? 1 : -1) : 0;
+  let dirY = moveAxis === "y" ? (dy > 0 ? 1 : -1) : 0;
+  let maxCells = maxMove(dragging, dirX, dirY);
+  maxPixels = maxCells * CELL;
+
+  let el = blockElements[dragging.id];
+
+  if (moveAxis === "x") {
+    let limited = Math.max(-maxPixels, Math.min(maxPixels, dx));
+    el.style.left = dragging.x * CELL + limited + "px";
+  } else {
+    let limited = Math.max(-maxPixels, Math.min(maxPixels, dy));
+    el.style.top = dragging.y * CELL + limited + "px";
+  }
+});
+
+document.addEventListener("pointerup", (e) => {
+  if (!dragging) return;
+
+  let el = blockElements[dragging.id];
+  el.style.transition = "left 0.15s ease, top 0.15s ease";
+
+  let dx = e.clientX - startX;
+  let dy = e.clientY - startY;
+
+  let dirX = 0,
+    dirY = 0;
+
+  if (moveAxis === "x") {
+    dirX = dx > 0 ? 1 : -1;
+  } else {
+    dirY = dy > 0 ? 1 : -1;
+  }
+
+  let maxCells = maxMove(dragging, dirX, dirY);
+  let moveCells = Math.round(Math.abs(moveAxis === "x" ? dx : dy) / CELL);
+  moveCells = Math.min(moveCells, maxCells);
+
+  if (moveCells > 0) {
+    moveBlock(dragging, dirX * moveCells, dirY * moveCells);
+
+    if (currentOpBlock !== dragging.id) {
+      steps++;
+      currentOpBlock = dragging.id;
+    }
+
+    saveState();
+    checkWin();
+  }
+
+  dragging = null;
+  moveAxis = null;
+
+  render();
+});
+
+function checkWin() {
+  let cc = blocks.find((b) => b.id === "cc");
+  if (cc.x === 1 && cc.y === 3) {
+    setTimeout(() => {
+      alert("胜利！共 " + steps + " 步");
+    }, 200);
+  }
+}
+
+function saveState() {
+  moveHistory.push(
+    JSON.stringify({ blocks, steps, currentOpBlock, currentLevel }),
+  );
+  localStorage.setItem("hrd", moveHistory[moveHistory.length - 1]);
+}
+
+function undo() {
+  if (moveHistory.length < 2) return;
+  moveHistory.pop();
+  let state = JSON.parse(moveHistory[moveHistory.length - 1]);
+  blocks = state.blocks;
+  steps = state.steps;
+  currentOpBlock = state.currentOpBlock;
+  initBoard();
+  render();
+}
+
+function resetGame() {
+  localStorage.removeItem("hrd");
+  loadLevel(currentLevel);
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  loadLevel(0);
+});
